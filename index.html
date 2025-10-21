@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Terminal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000000;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            color: #00ff00;
+        }
+
+        /* Animated background grid */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(0deg, transparent 24%, rgba(0, 255, 0, 0.05) 25%, rgba(0, 255, 0, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 255, 0, 0.05) 75%, rgba(0, 255, 0, 0.05) 76%, transparent 77%, transparent),
+                linear-gradient(90deg, transparent 24%, rgba(0, 255, 0, 0.05) 25%, rgba(0, 255, 0, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 255, 0, 0.05) 75%, rgba(0, 255, 0, 0.05) 76%, transparent 77%, transparent);
+            background-size: 50px 50px;
+            animation: gridScroll 20s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes gridScroll {
+            0% {
+                background-position: 0 0;
+            }
+
+            100% {
+                background-position: 50px 50px;
+            }
+        }
+
+        /* Scanlines effect */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.15),
+                    rgba(0, 0, 0, 0.15) 1px,
+                    transparent 1px,
+                    transparent 2px);
+            pointer-events: none;
+            z-index: 1;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% {
+                opacity: 0.97;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.97;
+            }
+        }
+
+        .terminal-container {
+            position: relative;
+            z-index: 2;
+            width: 90%;
+            max-width: 700px;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #00ff00;
+            border-radius: 8px;
+            box-shadow:
+                0 0 20px rgba(0, 255, 0, 0.3),
+                inset 0 0 20px rgba(0, 255, 0, 0.05),
+                0 0 40px rgba(0, 255, 0, 0.1);
+            overflow: hidden;
+            animation: terminalGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes terminalGlow {
+
+            0%,
+            100% {
+                box-shadow:
+                    0 0 20px rgba(0, 255, 0, 0.3),
+                    inset 0 0 20px rgba(0, 255, 0, 0.05),
+                    0 0 40px rgba(0, 255, 0, 0.1);
+                border-color: #00ff00;
+            }
+
+            50% {
+                box-shadow:
+                    0 0 30px rgba(0, 255, 0, 0.5),
+                    inset 0 0 25px rgba(0, 255, 0, 0.1),
+                    0 0 60px rgba(0, 255, 0, 0.2);
+                border-color: #80ff80;
+            }
+        }
+
+        .terminal-header {
+            background: linear-gradient(90deg, #003300 0%, #001a00 100%);
+            padding: 10px 15px;
+            border-bottom: 1px solid #00ff00;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .terminal-title {
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .terminal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-window {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-minimize {
+            background: #ffff00;
+        }
+
+        .btn-maximize {
+            background: #00ff00;
+        }
+
+        .btn-close {
+            background: #ff0000;
+        }
+
+        .btn-window:hover {
+            transform: scale(1.2);
+        }
+
+        .terminal-content {
+            padding: 20px;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .terminal-output {
+            margin-bottom: 20px;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .terminal-line {
+            margin-bottom: 8px;
+            opacity: 0;
+            animation: typeLine 0.5s ease-out forwards;
+        }
+
+        .terminal-line.delayed-1 {
+            position: relative;
+            overflow: hidden;
+            white-space: nowrap;
+            animation: typeWriter 1.5s steps(40, end) 0.3s forwards, fadeIn 0.1s 0.3s forwards;
+            width: 0;
+        }
+
+        .terminal-line.delayed-2 {
+            animation-delay: 1.0s;
+        }
+
+        .terminal-line.delayed-3 {
+            animation-delay: 1.8s;
+        }
+
+        .terminal-line.delayed-4 {
+            animation-delay: 2.8s;
+        }
+
+        .terminal-line.delayed-5 {
+            animation-delay: 3.8s;
+        }
+
+        /* New typing animation */
+        @keyframes typeLine {
+            0% {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            50% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes typeWriter {
+            from {
+                width: 0
+            }
+
+            to {
+                width: 100%
+            }
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1
+            }
+        }
+
+        /* Add subtle blink effect to prompt symbols */
+        .prompt::after {
+            content: '_';
+            animation: promptBlink 1s infinite;
+            opacity: 0;
+        }
+
+        @keyframes promptBlink {
+
+            0%,
+            50% {
+                opacity: 0
+            }
+
+            51%,
+            100% {
+                opacity: 1
+            }
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: #00ff00;
+            margin-left: 2px;
+            animation: blink 0.8s infinite, cursorPulse 2s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            49% {
+                opacity: 1;
+            }
+
+            50%,
+            100% {
+                opacity: 0;
+            }
+        }
+
+        @keyframes cursorPulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.7;
+                transform: scale(1.1);
+            }
+        }
+
+        .prompt {
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        .warning {
+            color: #ffff00;
+            animation: warningPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes warningPulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+        }
+
+        .success {
+            color: #00ff00;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+            animation: successGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes successGlow {
+
+            0%,
+            100% {
+                text-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+            }
+
+            50% {
+                text-shadow: 0 0 10px rgba(0, 255, 0, 0.6), 0 0 15px rgba(0, 255, 0, 0.3);
+            }
+        }
+
+        .error {
+            color: #ff0000;
+        }
+
+        .puzzle-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(0, 255, 0, 0.3);
+            opacity: 0;
+            animation: typeLine 0.5s ease-out 4.5s forwards;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .terminal-input {
+            flex: 1;
+            background: rgba(0, 255, 0, 0.05);
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            border-radius: 4px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .terminal-input:focus {
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5), inset 0 0 10px rgba(0, 255, 0, 0.1);
+            border-color: #00ff00;
+        }
+
+        .terminal-input::placeholder {
+            color: rgba(0, 255, 0, 0.5);
+        }
+
+        .btn-submit {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .btn-submit:hover {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .hint-btn {
+            background: rgba(255, 255, 0, 0.1);
+            border: 1px solid #ffff00;
+            color: #ffff00;
+            padding: 8px 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .hint-btn:hover {
+            background: rgba(255, 255, 0, 0.2);
+            box-shadow: 0 0 10px rgba(255, 255, 0, 0.5);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .success-message {
+            color: #00ff00;
+            font-weight: bold;
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .loading-dots {
+            display: inline-block;
+        }
+
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+
+            0%,
+            20% {
+                content: '';
+            }
+
+            40% {
+                content: '.';
+            }
+
+            60% {
+                content: '..';
+            }
+
+            80%,
+            100% {
+                content: '...';
+            }
+        }
+
+        @media (max-width: 600px) {
+            .terminal-container {
+                width: 95%;
+                max-width: 100%;
+            }
+
+            .terminal-content {
+                min-height: 350px;
+                padding: 15px;
+            }
+
+            .terminal-output {
+                font-size: 0.85rem;
+            }
+
+            .input-group {
+                flex-direction: column;
+            }
+
+            .btn-submit {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="terminal-container">
+        <div class="terminal-header">
+            <div class="terminal-title">SECURE_ACCESS_TERMINAL v2.1</div>
+            <div class="terminal-buttons">
+                <div class="btn-window btn-minimize"></div>
+                <div class="btn-window btn-maximize"></div>
+                <div class="btn-window btn-close"></div>
+            </div>
+        </div>
+
+        <div class="terminal-content">
+            <div class="terminal-output" id="terminalOutput">
+                <div class="terminal-line delayed-1">
+                    <span class="prompt">root@portfolio:~#</span> ./access_protocol.sh
+                </div>
+                <div class="terminal-line delayed-2">
+                    <span class="warning">[!] SECURITY CHECKPOINT INITIATED</span>
+                </div>
+                <div class="terminal-line delayed-3">
+                    <span class="prompt">[*]</span> Scanning credentials...
+                </div>
+                <div class="terminal-line delayed-4">
+                    <span class="success">[+] Identity Unverified!</span>
+                </div>
+                <div class="terminal-line delayed-5">
+                    <span class="warning">[!] PUZZLE CHALLENGE REQUIRED</span>
+                </div>
+            </div>
+
+            <div class="puzzle-section">
+                <div id="puzzleContent">
+                    <div class="terminal-line" style="margin-bottom: 15px;">
+                        <span class="warning">PUZZLE:</span> I am a language that runs in your browser, powers
+                        interactive websites, and is essential for modern web development. I can manipulate the DOM,
+                        handle events, and make async calls. What am I?
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <input type="text" class="terminal-input" id="answerInput" placeholder="Enter your answer here..."
+                        autocomplete="off">
+                    <button class="btn-submit" id="submitBtn">SUBMIT</button>
+                </div>
+
+                <button class="hint-btn" id="hintBtn">REVEAL HINT</button>
+                <button class="hint-btn" id="answerBtn"
+                    style="margin-left: 10px; border-color: #ff6600; color: #ff6600;">SHOW ANSWER</button>
+
+                <div id="feedbackMessage" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const answerInput = document.getElementById('answerInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const hintBtn = document.getElementById('hintBtn');
+        const answerBtn = document.getElementById('answerBtn');
+        const feedbackMessage = document.getElementById('feedbackMessage');
+        const puzzleContent = document.getElementById('puzzleContent');
+
+        // Correct answers (case-insensitive)
+        const correctAnswers = ['javascript', 'js', 'javascript language'];
+
+        // Hint revealed flag
+        let hintRevealed = false;
+        let answerRevealed = false;
+
+        // Handle submit
+        submitBtn.addEventListener('click', checkAnswer);
+        answerInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Add typing sound effect (optional)
+            function playTypeSound() {
+                // You can add a subtle typewriter sound here if desired
+            }
+
+            // Make the puzzle appear after all initial lines
+            setTimeout(() => {
+                document.querySelector('.puzzle-section').style.opacity = '0';
+                document.querySelector('.puzzle-section').style.animation = 'typeLine 0.5s ease-out forwards';
+            }, 4500); // After all initial lines have appeared
+        });
+
+        function checkAnswer() {
+            const userAnswer = answerInput.value.trim().toLowerCase();
+
+            if (!userAnswer) {
+                showFeedback('Please enter an answer!', 'error');
+                return;
+            }
+
+            if (correctAnswers.includes(userAnswer)) {
+                showFeedback('ACCESS GRANTED! Redirecting to portfolio...', 'success');
+                submitBtn.disabled = true;
+                answerInput.disabled = true;
+
+                setTimeout(() => {
+                    window.location.href = 'landingPage.html';
+                }, 2000);
+            } else {
+                showFeedback('INCORRECT! Try again or ask for a hint.', 'error');
+                answerInput.value = '';
+                answerInput.focus();
+            }
+        }
+
+        // Handle hint
+        hintBtn.addEventListener('click', () => {
+            if (!hintRevealed) {
+                const hintLine = document.createElement('div');
+                hintLine.className = 'terminal-line';
+                hintLine.innerHTML = '<span class="warning">[HINT REVEALED]</span> It starts with "J" and is often called the "language of the web"...';
+                puzzleContent.appendChild(hintLine);
+                hintRevealed = true;
+                hintBtn.textContent = 'HINT ALREADY REVEALED';
+                hintBtn.disabled = true;
+            }
+        });
+
+        // Handle answer reveal
+        answerBtn.addEventListener('click', () => {
+            if (!answerRevealed) {
+                const answerLine = document.createElement('div');
+                answerLine.className = 'terminal-line';
+                answerLine.innerHTML = '<span class="success">[ANSWER]</span> The answer is: <strong>JavaScript</strong>';
+                puzzleContent.appendChild(answerLine);
+                answerRevealed = true;
+                answerBtn.textContent = 'ANSWER REVEALED';
+                answerBtn.disabled = true;
+                answerInput.placeholder = 'Type "javascript" to proceed...';
+            }
+        });
+
+        function showFeedback(message, type) {
+            feedbackMessage.innerHTML = `<div class="terminal-line" style="color: ${type === 'success' ? '#00ff00' : '#ff0000'}; font-weight: bold;">${message}</div>`;
+        }
+
+        // Focus input after animations complete
+        setTimeout(() => {
+            answerInput.focus();
+        }, 5000);
+
+        // Easter egg: Konami code
+        const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+        let konamiIndex = 0;
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === konamiCode[konamiIndex]) {
+                konamiIndex++;
+                if (konamiIndex === konamiCode.length) {
+                    triggerEasterEgg();
+                    konamiIndex = 0;
+                }
+            } else {
+                konamiIndex = 0;
+            }
+        });
+
+        function triggerEasterEgg() {
+            const easterEggLine = document.createElement('div');
+            easterEggLine.className = 'terminal-line';
+            easterEggLine.innerHTML = '<span class="success">[EASTER EGG UNLOCKED]</span> You found the secret! You\'re a true hacker! 🎉';
+            feedbackMessage.appendChild(easterEggLine);
+        }
+    </script>
+</body>
+
+</html>
